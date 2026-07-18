@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Himāla Cove — Design Tokens
+   Single source of truth for color, type, spacing, radius, and shadow.
+   Tailwind v4 reads the @theme block below and generates utilities from it
+   (e.g. --color-pine → bg-pine, text-pine, border-pine, etc.)
+   ========================================================================== */
+
+:root {
+  /* ---- Brand palette -------------------------------------------------- */
+  --color-mist: #f5f6f1;       /* base background — cool, greenish off-white */
+  --color-mist-dim: #ecece4;   /* secondary section background */
+  --color-dusk: #10263d;       /* deep blue — primary text / dark surfaces */
+  --color-dusk-soft: #1c3550;  /* dusk, lightened for hover states */
+  --color-pine: #2c4638;       /* forest green — primary accent / CTAs */
+  --color-pine-soft: #3c5c4b;  /* pine hover */
+  --color-amber: #c2872f;      /* golden sunset — secondary accent */
+  --color-amber-soft: #d9a24f; /* amber hover */
+  --color-timber: #8a6244;     /* warm wood — tertiary accent */
+  --color-stone: #57625d;      /* slate gray — muted text */
+  --color-stone-light: #9aa39d;/* faint text / placeholders */
+  --color-line: #ddded4;       /* hairline borders on mist background */
+
+  /* ---- Semantic aliases ------------------------------------------------ */
+  --color-background: var(--color-mist);
+  --color-foreground: var(--color-dusk);
+  --color-surface: #ffffff;
+  --color-surface-muted: var(--color-mist-dim);
+  --color-accent: var(--color-pine);
+  --color-accent-foreground: #ffffff;
+  --color-highlight: var(--color-amber);
+  --color-muted: var(--color-stone);
+  --color-border: var(--color-line);
+  --color-success: #2c6b4f;
+  --color-warning: #b3691e;
+  --color-danger: #a3402f;
+
+  /* ---- Typography -------------------------------------------------------
+     display : Fraunces — editorial serif, used with restraint (H1/H2, quotes)
+     sans    : Inter — UI and body copy
+     mono    : IBM Plex Mono — prices, dates, booking references, labels
+     Font objects are wired to these variables in lib/fonts.ts
+  ------------------------------------------------------------------------ */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* ---- Radius ------------------------------------------------------------ */
+  --radius-sm: 0.5rem;   /* inputs, small badges */
+  --radius-md: 0.75rem;  /* buttons */
+  --radius-lg: 1rem;     /* cards */
+  --radius-xl: 1.5rem;   /* hero panels, modals */
+
+  /* ---- Shadow (warm-tinted, low opacity — no default gray drop-shadows) - */
+  --shadow-soft: 0 1px 2px rgba(16, 38, 61, 0.04), 0 8px 24px rgba(16, 38, 61, 0.06);
+  --shadow-elevated: 0 4px 12px rgba(16, 38, 61, 0.08), 0 16px 40px rgba(16, 38, 61, 0.10);
+  --shadow-glass: 0 8px 32px rgba(16, 38, 61, 0.18);
+}
+
+.dark {
+  --color-background: var(--color-dusk);
+  --color-foreground: var(--color-mist);
+  --color-surface: #16304a;
+  --color-surface-muted: #1c3550;
+  --color-border: #2a4460;
+  --color-muted: var(--color-stone-light);
+}
+
+/* ==========================================================================
+   Tailwind v4 theme registration
+   Exposes the tokens above as Tailwind utilities (bg-*, text-*, font-*...)
+   ========================================================================== */
+@theme inline {
+  --color-mist: var(--color-mist);
+  --color-mist-dim: var(--color-mist-dim);
+  --color-dusk: var(--color-dusk);
+  --color-dusk-soft: var(--color-dusk-soft);
+  --color-pine: var(--color-pine);
+  --color-pine-soft: var(--color-pine-soft);
+  --color-amber: var(--color-amber);
+  --color-amber-soft: var(--color-amber-soft);
+  --color-timber: var(--color-timber);
+  --color-stone: var(--color-stone);
+  --color-stone-light: var(--color-stone-light);
+  --color-line: var(--color-line);
+
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-highlight: var(--color-highlight);
+  --color-muted: var(--color-muted);
+  --color-border: var(--color-border);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-elevated: var(--shadow-elevated);
+  --shadow-glass: var(--shadow-glass);
+
+  /* Section rhythm — used as py-section / py-section-sm */
+  --spacing-section: 7rem;
+  --spacing-section-sm: 3rem;
+
+  /* Accordion open/close — used by components/ui/accordion.tsx */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/* ==========================================================================
+   Base styles
+   ========================================================================== */
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Numerals used across the booking engine — prices, dates, ref codes */
+.font-data {
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Visible keyboard focus everywhere — accessibility floor, not optional */
+:focus-visible {
+  outline: 2px solid var(--color-pine);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Signature contour-line divider — topographic motif echoing lake ripples
+   and elevation lines. Used between sections instead of a hard rule. */
+.contour-divider {
+  width: 100%;
+  height: 32px;
+  background-repeat: repeat-x;
+  background-size: 120px 32px;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='32' viewBox='0 0 120 32'%3E%3Cpath d='M0 16 Q 15 4, 30 16 T 60 16 T 90 16 T 120 16' fill='none' stroke='%232C4638' stroke-width='1' opacity='0.35'/%3E%3Cpath d='M0 24 Q 15 14, 30 24 T 60 24 T 90 24 T 120 24' fill='none' stroke='%23C2872F' stroke-width='1' opacity='0.25'/%3E%3C/svg%3E");
+}
