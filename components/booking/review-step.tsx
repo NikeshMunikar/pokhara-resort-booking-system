@@ -9,33 +9,13 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { InfoRow } from "@/components/ui/info-row";
 import { extraServices } from "@/lib/data/extra-services";
+import { paymentMethods } from "@/lib/data/payment-methods";
+import { arrivalTimeLabels } from "@/lib/data/arrival-times";
 import { calculateNights } from "@/lib/availability";
 import type { Room } from "@/lib/types/room";
 import type { GuestInfo } from "@/lib/booking-schema";
-
-const paymentMethods = [
-  { value: "pay-at-hotel", label: "Pay at Hotel" },
-  { value: "card", label: "Credit / Debit Card" },
-  { value: "khalti", label: "Khalti" },
-  { value: "esewa", label: "eSewa" },
-];
-
-const arrivalTimeLabels: Record<string, string> = {
-  morning: "Morning (8 AM – 12 PM)",
-  afternoon: "Afternoon (12 PM – 4 PM)",
-  evening: "Evening (4 PM – 8 PM)",
-  "late-night": "Late Night (After 8 PM)",
-};
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-line py-2 text-sm last:border-0">
-      <span className="text-stone">{label}</span>
-      <span className="text-right text-dusk">{value}</span>
-    </div>
-  );
-}
 
 interface ReviewStepProps {
   room: Room;

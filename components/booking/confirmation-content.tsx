@@ -5,32 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Mail, Clock, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { InfoRow } from "@/components/ui/info-row";
 import { rooms } from "@/lib/data/rooms";
 import { extraServices } from "@/lib/data/extra-services";
+import { paymentMethodLabels } from "@/lib/data/payment-methods";
+import { arrivalTimeLabels } from "@/lib/data/arrival-times";
 import { calculateNights, calculateEstimatedTotal } from "@/lib/availability";
-
-const arrivalTimeLabels: Record<string, string> = {
-  morning: "Morning (8 AM – 12 PM)",
-  afternoon: "Afternoon (12 PM – 4 PM)",
-  evening: "Evening (4 PM – 8 PM)",
-  "late-night": "Late Night (After 8 PM)",
-};
-
-const paymentMethodLabels: Record<string, string> = {
-  "pay-at-hotel": "Pay at Hotel",
-  card: "Credit / Debit Card",
-  khalti: "Khalti",
-  esewa: "eSewa",
-};
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-line py-2 text-sm last:border-0">
-      <span className="text-stone">{label}</span>
-      <span className="text-right text-dusk">{value}</span>
-    </div>
-  );
-}
 
 export function ConfirmationContent() {
   const searchParams = useSearchParams();

@@ -759,3 +759,89 @@ Update this file with:
 - architecture decisions
 - verification results
 - remaining tasks
+
+==================================================
+
+# NOTE: PHASE 2A RE-IMPLEMENTATION (SECOND ATTEMPT)
+
+Context:
+Phase 2A (Milestones 0-5) was previously implemented once already in a
+prior sandbox session, verified, and documented, but every commit was
+made only to a local sandbox clone. The commits were never pushed to
+GitHub, and that sandbox was subsequently lost (environment reset).
+Since origin/main only ever advanced to the original Phase 1 commit,
+the entire previous Phase 2A implementation had to be redone from
+scratch, using the file contents already captured in the working
+conversation as the reference.
+
+Lesson applied going forward: starting with this re-implementation,
+a unified diff patch file is saved under patches/ after every
+milestone commit, as an additional local backup independent of
+whether/when the commits are pushed to GitHub.
+
+==================================================
+
+# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 0: HOUSEKEEPING
+
+Status:
+COMPLETE
+
+Commit:
+(recorded below after commit)
+
+Scope:
+Deduplication only. No booking logic, routing, availability logic, or
+UI design changed. Identical in content and scope to the original
+Milestone 0 from the lost session.
+
+Files created:
+
+- lib/data/payment-methods.ts
+  Exports `paymentMethods` (value/label array for the Select) and a
+  derived `paymentMethodLabels` lookup map.
+- lib/data/arrival-times.ts
+  Exports `arrivalTimes` (value/label array for the Select) and a
+  derived `arrivalTimeLabels` lookup map.
+- components/ui/info-row.tsx
+  Shared label/value row component, copied verbatim from the
+  previously duplicated inline implementations (identical markup and
+  classNames).
+
+Files modified:
+
+- components/booking/review-step.tsx
+  Removed local `paymentMethods`, `arrivalTimeLabels`, and local
+  `InfoRow`; now imports all three from the new shared locations.
+- components/booking/confirmation-content.tsx
+  Removed local `arrivalTimeLabels`, `paymentMethodLabels`, and local
+  `InfoRow`; now imports all three from the new shared locations.
+- components/booking/guest-info-form.tsx
+  Removed local `arrivalTimes`; now imports it from
+  lib/data/arrival-times.ts. `nationalities` left untouched (out of
+  scope — not a duplicated value).
+
+Reason:
+
+Same as the original: paymentMethods/arrivalTimeLabels and InfoRow
+were duplicated across booking components with identical content
+typed out twice. Consolidated into single-source-of-truth files under
+lib/data/ and components/ui/, matching the existing rooms.ts
+single-source-of-truth convention. No behavior, styling, props, routes,
+or availability logic changed.
+
+Verification results:
+
+- `npx tsc --noEmit` → PASS, no errors
+- `npm run lint` → PASS, no errors or warnings
+- `git diff --stat` confirms only the 3 consumer files modified
+  (7 insertions, 53 deletions) plus 3 new files — identical diff shape
+  to the original Milestone 0, confirming a faithful re-implementation
+
+Backup:
+patches/0000-milestone-0-housekeeping.patch (added after commit)
+
+Remaining tasks (not part of this milestone):
+
+- react-day-picker dependency is still unused (flagged in original
+  audit, unchanged)
+- Milestones 1-5 not yet re-implemented

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { guestInfoSchema, type GuestInfo } from "@/lib/booking-schema";
+import { arrivalTimes } from "@/lib/data/arrival-times";
 
 const nationalities = [
   "Nepal",
@@ -27,13 +28,6 @@ const nationalities = [
   "France",
   "United Arab Emirates",
   "Other",
-];
-
-const arrivalTimes = [
-  { value: "morning", label: "Morning (8 AM – 12 PM)" },
-  { value: "afternoon", label: "Afternoon (12 PM – 4 PM)" },
-  { value: "evening", label: "Evening (4 PM – 8 PM)" },
-  { value: "late-night", label: "Late Night (After 8 PM)" },
 ];
 
 interface GuestInfoFormProps {
