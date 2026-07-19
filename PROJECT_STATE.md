@@ -927,7 +927,7 @@ Status:
 COMPLETE
 
 Commit:
-(recorded below after commit)
+261e6b9 — feat(booking): create reservation record on confirm via server action
 
 Scope:
 Wire reservation creation into the booking flow's final step only.
@@ -984,8 +984,7 @@ will show its existing "not found" fallback until Milestone 3 wires up
 reference-based lookup. Not a regression — expected per sequencing.
 
 Backup:
-patches/0002-milestone-2-reservation-creation.patch (added after
-commit)
+patches/0002-milestone-2-reservation-creation.patch
 
 Next milestone (not started):
 

@@ -1,0 +1,199 @@
+From 261e6b97ff603e04ae5c23210cd8f7706139f07e Mon Sep 17 00:00:00 2001
+From: Project Assistant <dev@himalacove.local>
+Date: Sun, 19 Jul 2026 17:34:02 +0000
+Subject: [PATCH] feat(booking): create reservation record on confirm via
+ server action
+
+Phase 2A re-implementation, Milestone 2 (reservation creation wiring
+only).
+
+- Add lib/actions/create-reservation.ts ("use server"):
+  createReservation(input) calls buildReservationRecord (Milestone 1)
+  and pushes into the shared bookings array, returning { reference }.
+  Single write seam, isolated for future database migration.
+- components/booking/booking-flow.tsx: handleConfirm is now async,
+  calls createReservation with existing wizard state, and navigates
+  with only ?ref=<reference> instead of a ~13-field query string.
+
+Unchanged: all wizard steps/components, validation, styling, routes.
+
+Known interim state (by design, resolved in Milestone 3):
+confirmation-content.tsx still expects room/date URL params and will
+show its existing 'not found' fallback until Milestone 3 wires up
+reference-based lookup there.
+
+Verified with npx tsc --noEmit, npm run lint (both clean), and a real
+integration run (via npx tsx) confirming createReservation correctly
+builds and pushes a reservation and returns a matching reference.
+---
+ PROJECT_STATE.md                    | 76 +++++++++++++++++++++++++++++
+ components/booking/booking-flow.tsx | 24 +++------
+ lib/actions/create-reservation.ts   | 22 +++++++++
+ 3 files changed, 105 insertions(+), 17 deletions(-)
+ create mode 100644 lib/actions/create-reservation.ts
+
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index 3003910..ec4924d 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -918,3 +918,79 @@ lib/actions/create-reservation.ts ("use server") calling
+ buildReservationRecord and pushing into `bookings`; update
+ booking-flow.tsx's handleConfirm to call it and navigate with only
+ ?ref=. Awaiting approval.
++
++==================================================
++
++# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 2: RESERVATION CREATION WIRING
++
++Status:
++COMPLETE
++
++Commit:
++(recorded below after commit)
++
++Scope:
++Wire reservation creation into the booking flow's final step only.
++No other wizard step, no confirmation-page changes (that's Milestone
++3), no availability changes. Identical in content and scope to the
++original Milestone 2 from the lost session.
++
++Files created:
++
++- lib/actions/create-reservation.ts
++  "use server" Server Action. `createReservation(input)` calls
++  `buildReservationRecord` (from Milestone 1) and pushes the result
++  into the `bookings` array, returning `{ reference }`. Single write
++  seam for reservation creation — a future database migration only
++  needs to replace this function's body with the same input/output
++  contract.
++
++Files modified:
++
++- components/booking/booking-flow.tsx
++  Only `handleConfirm` and one import line changed (net -17/+7 lines,
++  identical diff shape to the original Milestone 2).
++  - Removed: direct `generateBookingReference` call and manual
++    construction of a ~13-field URLSearchParams query string.
++  - Added: `handleConfirm` is now `async`, calls `createReservation`
++    with the wizard's existing state, then navigates with
++    `?ref=<reference>` only.
++  - Unchanged: all 4 wizard steps, all step components, validation,
++    styling, routes.
++
++Reason:
++
++Satisfies "customer booking creates a reservation record" using the
++approved Server Actions mechanism, isolated for future database
++migration.
++
++Verification results:
++
++- `npx tsc --noEmit` → PASS, no errors
++- `npm run lint` → PASS, no errors or warnings
++- `git diff --stat` confirms only components/booking/booking-flow.tsx
++  modified, plus the new lib/actions/create-reservation.ts — identical
++  scope to the original Milestone 2
++- Real integration check (via a temporary script, removed after use):
++  called the actual createReservation Server Action function with
++  realistic input, confirmed the returned reference matches the pushed
++  record, the bookings array grew by exactly 1, and roomId was
++  preserved correctly
++
++Known interim state (by design, resolved in Milestone 3):
++components/booking/confirmation-content.tsx was intentionally NOT
++modified in this milestone. It still expects room/date URL params and
++will show its existing "not found" fallback until Milestone 3 wires up
++reference-based lookup. Not a regression — expected per sequencing.
++
++Backup:
++patches/0002-milestone-2-reservation-creation.patch (added after
++commit)
++
++Next milestone (not started):
++
++Milestone 3 — confirmation by reference lookup: make
++app/booking/confirmation/page.tsx a Server Component reading
++searchParams.ref, call findReservationByReference, pass the result to
++a modified confirmation-content.tsx (accepts a `reservation` prop
++instead of reading useSearchParams itself). Awaiting approval.
+diff --git a/components/booking/booking-flow.tsx b/components/booking/booking-flow.tsx
+index 4870ffd..34fc5aa 100644
+--- a/components/booking/booking-flow.tsx
++++ b/components/booking/booking-flow.tsx
+@@ -12,7 +12,7 @@ import { BookingSummaryPanel } from "@/components/booking/booking-summary-panel"
+ import { rooms } from "@/lib/data/rooms";
+ import type { Room } from "@/lib/types/room";
+ import { defaultGuestInfo, type GuestInfo } from "@/lib/booking-schema";
+-import { generateBookingReference } from "@/lib/booking";
++import { createReservation } from "@/lib/actions/create-reservation";
+ 
+ export function BookingFlow() {
+   const router = useRouter();
+@@ -36,30 +36,20 @@ export function BookingFlow() {
+     );
+   }
+ 
+-  function handleConfirm() {
++  async function handleConfirm() {
+     if (!room) return;
+-    const reference = generateBookingReference(guestInfo.fullName, checkIn);
+ 
+-    const query = new URLSearchParams({
+-      ref: reference,
+-      room: room.id,
++    const { reference } = await createReservation({
++      roomId: room.id,
+       checkIn,
+       checkOut,
+       guests,
+-      fullName: guestInfo.fullName,
+-      email: guestInfo.email,
+-      phone: guestInfo.phone,
+-      nationality: guestInfo.nationality,
+-      arrivalTime: guestInfo.arrivalTime,
++      guestInfo,
++      selectedExtraIds,
+       paymentMethod,
+     });
+-    if (guestInfo.specialRequests) {
+-      query.set("specialRequests", guestInfo.specialRequests);
+-    }
+-    if (selectedExtraIds.length > 0) {
+-      query.set("extras", selectedExtraIds.join(","));
+-    }
+ 
++    const query = new URLSearchParams({ ref: reference });
+     router.push(`/booking/confirmation?${query.toString()}`);
+   }
+ 
+diff --git a/lib/actions/create-reservation.ts b/lib/actions/create-reservation.ts
+new file mode 100644
+index 0000000..654d168
+--- /dev/null
++++ b/lib/actions/create-reservation.ts
+@@ -0,0 +1,22 @@
++"use server";
++
++import { bookings } from "@/lib/data/bookings";
++import { buildReservationRecord, type CreateReservationInput } from "@/lib/reservations";
++
++/**
++ * Creates a reservation from booking-flow input and returns its reference.
++ *
++ * This is the single write seam for reservation creation — the only place
++ * in the app that pushes into the `bookings` array. Keeping the write
++ * isolated here means a future database migration only needs to replace
++ * the body of this function (e.g. `bookings.push(...)` becomes
++ * `await prisma.booking.create(...)`), with the same input/output
++ * contract, so callers like booking-flow.tsx don't need to change.
++ */
++export async function createReservation(
++  input: CreateReservationInput
++): Promise<{ reference: string }> {
++  const reservation = buildReservationRecord(input);
++  bookings.push(reservation);
++  return { reference: reservation.reference };
++}
+-- 
+2.43.0
+
