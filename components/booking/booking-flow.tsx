@@ -12,7 +12,7 @@ import { BookingSummaryPanel } from "@/components/booking/booking-summary-panel"
 import { rooms } from "@/lib/data/rooms";
 import type { Room } from "@/lib/types/room";
 import { defaultGuestInfo, type GuestInfo } from "@/lib/booking-schema";
-import { generateBookingReference } from "@/lib/booking";
+import { createReservation } from "@/lib/actions/create-reservation";
 
 export function BookingFlow() {
   const router = useRouter();
@@ -36,30 +36,20 @@ export function BookingFlow() {
     );
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!room) return;
-    const reference = generateBookingReference(guestInfo.fullName, checkIn);
 
-    const query = new URLSearchParams({
-      ref: reference,
-      room: room.id,
+    const { reference } = await createReservation({
+      roomId: room.id,
       checkIn,
       checkOut,
       guests,
-      fullName: guestInfo.fullName,
-      email: guestInfo.email,
-      phone: guestInfo.phone,
-      nationality: guestInfo.nationality,
-      arrivalTime: guestInfo.arrivalTime,
+      guestInfo,
+      selectedExtraIds,
       paymentMethod,
     });
-    if (guestInfo.specialRequests) {
-      query.set("specialRequests", guestInfo.specialRequests);
-    }
-    if (selectedExtraIds.length > 0) {
-      query.set("extras", selectedExtraIds.join(","));
-    }
 
+    const query = new URLSearchParams({ ref: reference });
     router.push(`/booking/confirmation?${query.toString()}`);
   }
 

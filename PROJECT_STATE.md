@@ -918,3 +918,79 @@ lib/actions/create-reservation.ts ("use server") calling
 buildReservationRecord and pushing into `bookings`; update
 booking-flow.tsx's handleConfirm to call it and navigate with only
 ?ref=. Awaiting approval.
+
+==================================================
+
+# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 2: RESERVATION CREATION WIRING
+
+Status:
+COMPLETE
+
+Commit:
+(recorded below after commit)
+
+Scope:
+Wire reservation creation into the booking flow's final step only.
+No other wizard step, no confirmation-page changes (that's Milestone
+3), no availability changes. Identical in content and scope to the
+original Milestone 2 from the lost session.
+
+Files created:
+
+- lib/actions/create-reservation.ts
+  "use server" Server Action. `createReservation(input)` calls
+  `buildReservationRecord` (from Milestone 1) and pushes the result
+  into the `bookings` array, returning `{ reference }`. Single write
+  seam for reservation creation — a future database migration only
+  needs to replace this function's body with the same input/output
+  contract.
+
+Files modified:
+
+- components/booking/booking-flow.tsx
+  Only `handleConfirm` and one import line changed (net -17/+7 lines,
+  identical diff shape to the original Milestone 2).
+  - Removed: direct `generateBookingReference` call and manual
+    construction of a ~13-field URLSearchParams query string.
+  - Added: `handleConfirm` is now `async`, calls `createReservation`
+    with the wizard's existing state, then navigates with
+    `?ref=<reference>` only.
+  - Unchanged: all 4 wizard steps, all step components, validation,
+    styling, routes.
+
+Reason:
+
+Satisfies "customer booking creates a reservation record" using the
+approved Server Actions mechanism, isolated for future database
+migration.
+
+Verification results:
+
+- `npx tsc --noEmit` → PASS, no errors
+- `npm run lint` → PASS, no errors or warnings
+- `git diff --stat` confirms only components/booking/booking-flow.tsx
+  modified, plus the new lib/actions/create-reservation.ts — identical
+  scope to the original Milestone 2
+- Real integration check (via a temporary script, removed after use):
+  called the actual createReservation Server Action function with
+  realistic input, confirmed the returned reference matches the pushed
+  record, the bookings array grew by exactly 1, and roomId was
+  preserved correctly
+
+Known interim state (by design, resolved in Milestone 3):
+components/booking/confirmation-content.tsx was intentionally NOT
+modified in this milestone. It still expects room/date URL params and
+will show its existing "not found" fallback until Milestone 3 wires up
+reference-based lookup. Not a regression — expected per sequencing.
+
+Backup:
+patches/0002-milestone-2-reservation-creation.patch (added after
+commit)
+
+Next milestone (not started):
+
+Milestone 3 — confirmation by reference lookup: make
+app/booking/confirmation/page.tsx a Server Component reading
+searchParams.ref, call findReservationByReference, pass the result to
+a modified confirmation-content.tsx (accepts a `reservation` prop
+instead of reading useSearchParams itself). Awaiting approval.
