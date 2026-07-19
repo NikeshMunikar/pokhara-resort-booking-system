@@ -1,0 +1,314 @@
+From 44cee1f75d812bc2baf2aadb2e5af0bb5e361192 Mon Sep 17 00:00:00 2001
+From: Project Assistant <dev@himalacove.local>
+Date: Sun, 19 Jul 2026 17:04:56 +0000
+Subject: [PATCH] chore: extract shared payment methods, arrival times, and
+ InfoRow
+
+Phase 2A re-implementation, Milestone 0 (housekeeping).
+
+This redoes work that was previously completed and verified in a prior
+sandbox session, but was never pushed to GitHub and was lost when that
+sandbox's environment reset. Re-implemented faithfully from the same
+plan, same file contents, same scope.
+
+- Add lib/data/payment-methods.ts (paymentMethods + derived
+  paymentMethodLabels), replacing duplicated consts in review-step.tsx
+  and confirmation-content.tsx
+- Add lib/data/arrival-times.ts (arrivalTimes + derived
+  arrivalTimeLabels), replacing duplicated consts in review-step.tsx,
+  confirmation-content.tsx, and guest-info-form.tsx
+- Add components/ui/info-row.tsx, replacing duplicated InfoRow
+  implementations in review-step.tsx and confirmation-content.tsx
+
+No behavior, styling, props, routes, or business logic changed.
+Verified with npx tsc --noEmit and npm run lint (both clean).
+---
+ PROJECT_STATE.md                            | 86 +++++++++++++++++++++
+ components/booking/confirmation-content.tsx | 26 +------
+ components/booking/guest-info-form.tsx      |  8 +-
+ components/booking/review-step.tsx          | 26 +------
+ components/ui/info-row.tsx                  | 13 ++++
+ lib/data/arrival-times.ts                   | 20 +++++
+ lib/data/payment-methods.ts                 | 20 +++++
+ 7 files changed, 146 insertions(+), 53 deletions(-)
+ create mode 100644 components/ui/info-row.tsx
+ create mode 100644 lib/data/arrival-times.ts
+ create mode 100644 lib/data/payment-methods.ts
+
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index db0eea3..8cee5b8 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -759,3 +759,89 @@ Update this file with:
+ - architecture decisions
+ - verification results
+ - remaining tasks
++
++==================================================
++
++# NOTE: PHASE 2A RE-IMPLEMENTATION (SECOND ATTEMPT)
++
++Context:
++Phase 2A (Milestones 0-5) was previously implemented once already in a
++prior sandbox session, verified, and documented, but every commit was
++made only to a local sandbox clone. The commits were never pushed to
++GitHub, and that sandbox was subsequently lost (environment reset).
++Since origin/main only ever advanced to the original Phase 1 commit,
++the entire previous Phase 2A implementation had to be redone from
++scratch, using the file contents already captured in the working
++conversation as the reference.
++
++Lesson applied going forward: starting with this re-implementation,
++a unified diff patch file is saved under patches/ after every
++milestone commit, as an additional local backup independent of
++whether/when the commits are pushed to GitHub.
++
++==================================================
++
++# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 0: HOUSEKEEPING
++
++Status:
++COMPLETE
++
++Commit:
++(recorded below after commit)
++
++Scope:
++Deduplication only. No booking logic, routing, availability logic, or
++UI design changed. Identical in content and scope to the original
++Milestone 0 from the lost session.
++
++Files created:
++
++- lib/data/payment-methods.ts
++  Exports `paymentMethods` (value/label array for the Select) and a
++  derived `paymentMethodLabels` lookup map.
++- lib/data/arrival-times.ts
++  Exports `arrivalTimes` (value/label array for the Select) and a
++  derived `arrivalTimeLabels` lookup map.
++- components/ui/info-row.tsx
++  Shared label/value row component, copied verbatim from the
++  previously duplicated inline implementations (identical markup and
++  classNames).
++
++Files modified:
++
++- components/booking/review-step.tsx
++  Removed local `paymentMethods`, `arrivalTimeLabels`, and local
++  `InfoRow`; now imports all three from the new shared locations.
++- components/booking/confirmation-content.tsx
++  Removed local `arrivalTimeLabels`, `paymentMethodLabels`, and local
++  `InfoRow`; now imports all three from the new shared locations.
++- components/booking/guest-info-form.tsx
++  Removed local `arrivalTimes`; now imports it from
++  lib/data/arrival-times.ts. `nationalities` left untouched (out of
++  scope — not a duplicated value).
++
++Reason:
++
++Same as the original: paymentMethods/arrivalTimeLabels and InfoRow
++were duplicated across booking components with identical content
++typed out twice. Consolidated into single-source-of-truth files under
++lib/data/ and components/ui/, matching the existing rooms.ts
++single-source-of-truth convention. No behavior, styling, props, routes,
++or availability logic changed.
++
++Verification results:
++
++- `npx tsc --noEmit` → PASS, no errors
++- `npm run lint` → PASS, no errors or warnings
++- `git diff --stat` confirms only the 3 consumer files modified
++  (7 insertions, 53 deletions) plus 3 new files — identical diff shape
++  to the original Milestone 0, confirming a faithful re-implementation
++
++Backup:
++patches/0000-milestone-0-housekeeping.patch (added after commit)
++
++Remaining tasks (not part of this milestone):
++
++- react-day-picker dependency is still unused (flagged in original
++  audit, unchanged)
++- Milestones 1-5 not yet re-implemented
+diff --git a/components/booking/confirmation-content.tsx b/components/booking/confirmation-content.tsx
+index 71c4110..f520df3 100644
+--- a/components/booking/confirmation-content.tsx
++++ b/components/booking/confirmation-content.tsx
+@@ -5,33 +5,13 @@ import { useSearchParams } from "next/navigation";
+ import { CheckCircle2, Mail, Clock, PhoneCall } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
++import { InfoRow } from "@/components/ui/info-row";
+ import { rooms } from "@/lib/data/rooms";
+ import { extraServices } from "@/lib/data/extra-services";
++import { paymentMethodLabels } from "@/lib/data/payment-methods";
++import { arrivalTimeLabels } from "@/lib/data/arrival-times";
+ import { calculateNights, calculateEstimatedTotal } from "@/lib/availability";
+ 
+-const arrivalTimeLabels: Record<string, string> = {
+-  morning: "Morning (8 AM – 12 PM)",
+-  afternoon: "Afternoon (12 PM – 4 PM)",
+-  evening: "Evening (4 PM – 8 PM)",
+-  "late-night": "Late Night (After 8 PM)",
+-};
+-
+-const paymentMethodLabels: Record<string, string> = {
+-  "pay-at-hotel": "Pay at Hotel",
+-  card: "Credit / Debit Card",
+-  khalti: "Khalti",
+-  esewa: "eSewa",
+-};
+-
+-function InfoRow({ label, value }: { label: string; value: string }) {
+-  return (
+-    <div className="flex justify-between gap-4 border-b border-line py-2 text-sm last:border-0">
+-      <span className="text-stone">{label}</span>
+-      <span className="text-right text-dusk">{value}</span>
+-    </div>
+-  );
+-}
+-
+ export function ConfirmationContent() {
+   const searchParams = useSearchParams();
+ 
+diff --git a/components/booking/guest-info-form.tsx b/components/booking/guest-info-form.tsx
+index a0c062b..10b4fe2 100644
+--- a/components/booking/guest-info-form.tsx
++++ b/components/booking/guest-info-form.tsx
+@@ -14,6 +14,7 @@ import {
+   SelectValue,
+ } from "@/components/ui/select";
+ import { guestInfoSchema, type GuestInfo } from "@/lib/booking-schema";
++import { arrivalTimes } from "@/lib/data/arrival-times";
+ 
+ const nationalities = [
+   "Nepal",
+@@ -29,13 +30,6 @@ const nationalities = [
+   "Other",
+ ];
+ 
+-const arrivalTimes = [
+-  { value: "morning", label: "Morning (8 AM – 12 PM)" },
+-  { value: "afternoon", label: "Afternoon (12 PM – 4 PM)" },
+-  { value: "evening", label: "Evening (4 PM – 8 PM)" },
+-  { value: "late-night", label: "Late Night (After 8 PM)" },
+-];
+-
+ interface GuestInfoFormProps {
+   defaultValues: GuestInfo;
+   onBack: () => void;
+diff --git a/components/booking/review-step.tsx b/components/booking/review-step.tsx
+index c50921a..04b33c4 100644
+--- a/components/booking/review-step.tsx
++++ b/components/booking/review-step.tsx
+@@ -9,34 +9,14 @@ import {
+ } from "@/components/ui/select";
+ import { Label } from "@/components/ui/label";
+ import { Button } from "@/components/ui/button";
++import { InfoRow } from "@/components/ui/info-row";
+ import { extraServices } from "@/lib/data/extra-services";
++import { paymentMethods } from "@/lib/data/payment-methods";
++import { arrivalTimeLabels } from "@/lib/data/arrival-times";
+ import { calculateNights } from "@/lib/availability";
+ import type { Room } from "@/lib/types/room";
+ import type { GuestInfo } from "@/lib/booking-schema";
+ 
+-const paymentMethods = [
+-  { value: "pay-at-hotel", label: "Pay at Hotel" },
+-  { value: "card", label: "Credit / Debit Card" },
+-  { value: "khalti", label: "Khalti" },
+-  { value: "esewa", label: "eSewa" },
+-];
+-
+-const arrivalTimeLabels: Record<string, string> = {
+-  morning: "Morning (8 AM – 12 PM)",
+-  afternoon: "Afternoon (12 PM – 4 PM)",
+-  evening: "Evening (4 PM – 8 PM)",
+-  "late-night": "Late Night (After 8 PM)",
+-};
+-
+-function InfoRow({ label, value }: { label: string; value: string }) {
+-  return (
+-    <div className="flex justify-between gap-4 border-b border-line py-2 text-sm last:border-0">
+-      <span className="text-stone">{label}</span>
+-      <span className="text-right text-dusk">{value}</span>
+-    </div>
+-  );
+-}
+-
+ interface ReviewStepProps {
+   room: Room;
+   checkIn: string;
+diff --git a/components/ui/info-row.tsx b/components/ui/info-row.tsx
+new file mode 100644
+index 0000000..bd3457e
+--- /dev/null
++++ b/components/ui/info-row.tsx
+@@ -0,0 +1,13 @@
++interface InfoRowProps {
++  label: string;
++  value: string;
++}
++
++export function InfoRow({ label, value }: InfoRowProps) {
++  return (
++    <div className="flex justify-between gap-4 border-b border-line py-2 text-sm last:border-0">
++      <span className="text-stone">{label}</span>
++      <span className="text-right text-dusk">{value}</span>
++    </div>
++  );
++}
+diff --git a/lib/data/arrival-times.ts b/lib/data/arrival-times.ts
+new file mode 100644
+index 0000000..946e419
+--- /dev/null
++++ b/lib/data/arrival-times.ts
+@@ -0,0 +1,20 @@
++export interface ArrivalTimeOption {
++  value: string;
++  label: string;
++}
++
++export const arrivalTimes: ArrivalTimeOption[] = [
++  { value: "morning", label: "Morning (8 AM – 12 PM)" },
++  { value: "afternoon", label: "Afternoon (12 PM – 4 PM)" },
++  { value: "evening", label: "Evening (4 PM – 8 PM)" },
++  { value: "late-night", label: "Late Night (After 8 PM)" },
++];
++
++/** Derived lookup map — stays in sync with `arrivalTimes` automatically. */
++export const arrivalTimeLabels: Record<string, string> = arrivalTimes.reduce(
++  (acc, time) => {
++    acc[time.value] = time.label;
++    return acc;
++  },
++  {} as Record<string, string>
++);
+diff --git a/lib/data/payment-methods.ts b/lib/data/payment-methods.ts
+new file mode 100644
+index 0000000..f204a3a
+--- /dev/null
++++ b/lib/data/payment-methods.ts
+@@ -0,0 +1,20 @@
++export interface PaymentMethodOption {
++  value: string;
++  label: string;
++}
++
++export const paymentMethods: PaymentMethodOption[] = [
++  { value: "pay-at-hotel", label: "Pay at Hotel" },
++  { value: "card", label: "Credit / Debit Card" },
++  { value: "khalti", label: "Khalti" },
++  { value: "esewa", label: "eSewa" },
++];
++
++/** Derived lookup map — stays in sync with `paymentMethods` automatically. */
++export const paymentMethodLabels: Record<string, string> = paymentMethods.reduce(
++  (acc, method) => {
++    acc[method.value] = method.label;
++    return acc;
++  },
++  {} as Record<string, string>
++);
+-- 
+2.43.0
+

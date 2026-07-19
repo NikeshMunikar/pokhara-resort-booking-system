@@ -787,7 +787,7 @@ Status:
 COMPLETE
 
 Commit:
-(recorded below after commit)
+44cee1f — chore: extract shared payment methods, arrival times, and InfoRow
 
 Scope:
 Deduplication only. No booking logic, routing, availability logic, or
@@ -838,7 +838,7 @@ Verification results:
   to the original Milestone 0, confirming a faithful re-implementation
 
 Backup:
-patches/0000-milestone-0-housekeeping.patch (added after commit)
+patches/0001-chore-extract-shared-payment-methods-arrival-times-a.patch
 
 Remaining tasks (not part of this milestone):
 
