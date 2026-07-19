@@ -1,0 +1,208 @@
+From 0c98a71eab91a971eacc65c34550de1aa7cf2f6e Mon Sep 17 00:00:00 2001
+From: Project Assistant <dev@himalacove.local>
+Date: Sun, 19 Jul 2026 17:09:17 +0000
+Subject: [PATCH] feat(reservations): add reservation record builder and lookup
+ helpers
+
+Phase 2A re-implementation, Milestone 1 (data layer only).
+
+- Extend OperationsBooking (lib/data/bookings.ts) with additive
+  optional fields: guests, guestEmail, guestPhone, guestNationality,
+  arrivalTime, specialRequests, selectedExtraIds, paymentMethod. All
+  existing seed bookings remain unchanged and valid.
+- Add lib/reservations.ts:
+  - CreateReservationInput
+  - buildReservationRecord(input) -- pure builder, does not write to
+    the bookings array
+  - findReservationByReference(reference) -- lookup helper
+
+Not wired into any component yet (booking flow, confirmation page,
+and operations dashboard are unaffected). Reserved for Milestones 2
+and 3.
+
+Verified with npx tsc --noEmit and npm run lint (both clean).
+---
+ PROJECT_STATE.md     | 74 ++++++++++++++++++++++++++++++++++++++++++++
+ lib/data/bookings.ts | 14 +++++++++
+ lib/reservations.ts  | 62 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 150 insertions(+)
+ create mode 100644 lib/reservations.ts
+
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index 7995a19..86a3a1c 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -845,3 +845,77 @@ Remaining tasks (not part of this milestone):
+ - react-day-picker dependency is still unused (flagged in original
+   audit, unchanged)
+ - Milestones 1-5 not yet re-implemented
++
++==================================================
++
++# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 1: DATA LAYER
++
++Status:
++COMPLETE
++
++Commit:
++(recorded below after commit)
++
++Scope:
++Additive data-layer changes only. No UI, routes, or wiring into the
++booking flow — helpers exist but are not yet called from anywhere.
++Identical in content and scope to the original Milestone 1 from the
++lost session.
++
++Files modified:
++
++- lib/data/bookings.ts
++  Extended `OperationsBooking` with optional fields: `guests?`,
++  `guestEmail?`, `guestPhone?`, `guestNationality?`, `arrivalTime?`,
++  `specialRequests?`, `selectedExtraIds?`, `paymentMethod?`. All 8 new
++  fields are optional — the 14 existing seed bookings are byte-for-byte
++  unchanged and remain fully valid against the widened interface.
++
++Files created:
++
++- lib/reservations.ts
++  - `CreateReservationInput` — input shape mirroring what the booking
++    wizard already collects (roomId, dates, guests, GuestInfo,
++    selectedExtraIds, paymentMethod).
++  - `buildReservationRecord(input)` — pure function that builds a
++    complete `OperationsBooking` record (id, reference via the existing
++    `generateBookingReference`, bookedOn, status "Confirmed", plus all
++    the additive guest/extras/payment fields). Does not push into the
++    `bookings` array itself — the write happens in Milestone 2.
++  - `findReservationByReference(reference)` — looks up a booking by
++    `reference` from the existing `bookings` array. Not called from any
++    component yet — reserved for Milestone 3 (confirmation lookup).
++
++Reason:
++
++Establishes the reservation record shape and lookup logic in isolation
++before anything depends on it, per the approved Phase 2A plan
++(Milestone 1 of 5). Lowest-risk first step — no behavior anywhere in
++the app changes as a result of this milestone.
++
++Verification results:
++
++- `npx tsc --noEmit` → PASS, no errors
++- `npm run lint` → PASS, no errors or warnings
++- `git diff --stat` confirms only lib/data/bookings.ts (14 insertions,
++  0 deletions) was modified, plus the new lib/reservations.ts —
++  identical diff shape to the original Milestone 1
++- Confirmed via grep that `buildReservationRecord`,
++  `findReservationByReference`, and `CreateReservationInput` are not
++  referenced anywhere outside lib/reservations.ts — helpers are inert
++  until Milestone 2/3 wire them in
++- No existing functionality affected: booking flow, confirmation page,
++  operations dashboard, availability, routes, and design system are
++  byte-for-byte unchanged in this milestone
++
++Backup:
++patches/0002-*.patch (added after commit, see PROJECT_STATE.md commit
++history or the patches/ directory for the exact filename)
++
++Next milestone (not started):
++
++Milestone 2 — reservation creation wiring: create
++lib/actions/create-reservation.ts ("use server") calling
++buildReservationRecord and pushing into `bookings`; update
++booking-flow.tsx's handleConfirm to call it and navigate with only
++?ref=. Awaiting approval.
+diff --git a/lib/data/bookings.ts b/lib/data/bookings.ts
+index 752402d..8bb0f17 100644
+--- a/lib/data/bookings.ts
++++ b/lib/data/bookings.ts
+@@ -11,6 +11,20 @@ export interface OperationsBooking {
+   bookedOn: string;
+   status: BookingStatus;
+   reference: string;
++  /**
++   * Additive fields below — populated for reservations created through
++   * the live booking flow (Phase 2A). Optional so all existing seed
++   * bookings above remain valid without changes. Operations dashboard
++   * components are unaffected since none of these are read there yet.
++   */
++  guests?: string;
++  guestEmail?: string;
++  guestPhone?: string;
++  guestNationality?: string;
++  arrivalTime?: string;
++  specialRequests?: string;
++  selectedExtraIds?: string[];
++  paymentMethod?: string;
+ }
+ 
+ /** ISO date string (YYYY-MM-DD) for today + offsetDays. */
+diff --git a/lib/reservations.ts b/lib/reservations.ts
+new file mode 100644
+index 0000000..feada46
+--- /dev/null
++++ b/lib/reservations.ts
+@@ -0,0 +1,62 @@
++import { bookings, type OperationsBooking, type BookingStatus } from "@/lib/data/bookings";
++import { generateBookingReference } from "@/lib/booking";
++import type { GuestInfo } from "@/lib/booking-schema";
++
++/**
++ * Input needed to build a reservation record from the booking flow.
++ * Mirrors the fields already collected by the wizard — no new data
++ * is requested from the guest.
++ */
++export interface CreateReservationInput {
++  roomId: string;
++  checkIn: string;
++  checkOut: string;
++  guests: string;
++  guestInfo: GuestInfo;
++  selectedExtraIds: string[];
++  paymentMethod: string;
++}
++
++/** Today as an ISO date string (YYYY-MM-DD), matching lib/data/bookings.ts's convention. */
++function todayIso(): string {
++  const date = new Date();
++  date.setHours(0, 0, 0, 0);
++  return date.toISOString().slice(0, 10);
++}
++
++/**
++ * Builds a complete OperationsBooking record from booking-flow input.
++ * Pure function — does not push into the `bookings` array itself, so it
++ * can be unit-tested or reused independently of where the write happens.
++ */
++export function buildReservationRecord(input: CreateReservationInput): OperationsBooking {
++  const status: BookingStatus = "Confirmed";
++
++  return {
++    id: `res-${Date.now()}`,
++    guestName: input.guestInfo.fullName,
++    roomId: input.roomId,
++    checkIn: input.checkIn,
++    checkOut: input.checkOut,
++    bookedOn: todayIso(),
++    status,
++    reference: generateBookingReference(input.guestInfo.fullName, input.checkIn),
++    guests: input.guests,
++    guestEmail: input.guestInfo.email,
++    guestPhone: input.guestInfo.phone,
++    guestNationality: input.guestInfo.nationality,
++    arrivalTime: input.guestInfo.arrivalTime,
++    specialRequests: input.guestInfo.specialRequests,
++    selectedExtraIds: input.selectedExtraIds,
++    paymentMethod: input.paymentMethod,
++  };
++}
++
++/**
++ * Looks up a reservation by its booking reference (e.g. "HC-482913").
++ * Used by the confirmation page in Phase 2A milestone 3 — not called
++ * anywhere yet in this milestone.
++ */
++export function findReservationByReference(reference: string): OperationsBooking | undefined {
++  return bookings.find((booking) => booking.reference === reference);
++}
+-- 
+2.43.0
+

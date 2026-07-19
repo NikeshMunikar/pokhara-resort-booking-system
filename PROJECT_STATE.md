@@ -838,7 +838,7 @@ Verification results:
   to the original Milestone 0, confirming a faithful re-implementation
 
 Backup:
-patches/0001-chore-extract-shared-payment-methods-arrival-times-a.patch
+patches/0000-milestone-0-housekeeping.patch
 
 Remaining tasks (not part of this milestone):
 
@@ -854,7 +854,7 @@ Status:
 COMPLETE
 
 Commit:
-(recorded below after commit)
+0c98a71 — feat(reservations): add reservation record builder and lookup helpers
 
 Scope:
 Additive data-layer changes only. No UI, routes, or wiring into the
@@ -909,8 +909,7 @@ Verification results:
   byte-for-byte unchanged in this milestone
 
 Backup:
-patches/0002-*.patch (added after commit, see PROJECT_STATE.md commit
-history or the patches/ directory for the exact filename)
+patches/0001-milestone-1-data-layer.patch
 
 Next milestone (not started):
 
