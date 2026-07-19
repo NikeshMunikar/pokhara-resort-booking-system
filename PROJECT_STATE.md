@@ -845,3 +845,77 @@ Remaining tasks (not part of this milestone):
 - react-day-picker dependency is still unused (flagged in original
   audit, unchanged)
 - Milestones 1-5 not yet re-implemented
+
+==================================================
+
+# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 1: DATA LAYER
+
+Status:
+COMPLETE
+
+Commit:
+(recorded below after commit)
+
+Scope:
+Additive data-layer changes only. No UI, routes, or wiring into the
+booking flow — helpers exist but are not yet called from anywhere.
+Identical in content and scope to the original Milestone 1 from the
+lost session.
+
+Files modified:
+
+- lib/data/bookings.ts
+  Extended `OperationsBooking` with optional fields: `guests?`,
+  `guestEmail?`, `guestPhone?`, `guestNationality?`, `arrivalTime?`,
+  `specialRequests?`, `selectedExtraIds?`, `paymentMethod?`. All 8 new
+  fields are optional — the 14 existing seed bookings are byte-for-byte
+  unchanged and remain fully valid against the widened interface.
+
+Files created:
+
+- lib/reservations.ts
+  - `CreateReservationInput` — input shape mirroring what the booking
+    wizard already collects (roomId, dates, guests, GuestInfo,
+    selectedExtraIds, paymentMethod).
+  - `buildReservationRecord(input)` — pure function that builds a
+    complete `OperationsBooking` record (id, reference via the existing
+    `generateBookingReference`, bookedOn, status "Confirmed", plus all
+    the additive guest/extras/payment fields). Does not push into the
+    `bookings` array itself — the write happens in Milestone 2.
+  - `findReservationByReference(reference)` — looks up a booking by
+    `reference` from the existing `bookings` array. Not called from any
+    component yet — reserved for Milestone 3 (confirmation lookup).
+
+Reason:
+
+Establishes the reservation record shape and lookup logic in isolation
+before anything depends on it, per the approved Phase 2A plan
+(Milestone 1 of 5). Lowest-risk first step — no behavior anywhere in
+the app changes as a result of this milestone.
+
+Verification results:
+
+- `npx tsc --noEmit` → PASS, no errors
+- `npm run lint` → PASS, no errors or warnings
+- `git diff --stat` confirms only lib/data/bookings.ts (14 insertions,
+  0 deletions) was modified, plus the new lib/reservations.ts —
+  identical diff shape to the original Milestone 1
+- Confirmed via grep that `buildReservationRecord`,
+  `findReservationByReference`, and `CreateReservationInput` are not
+  referenced anywhere outside lib/reservations.ts — helpers are inert
+  until Milestone 2/3 wire them in
+- No existing functionality affected: booking flow, confirmation page,
+  operations dashboard, availability, routes, and design system are
+  byte-for-byte unchanged in this milestone
+
+Backup:
+patches/0002-*.patch (added after commit, see PROJECT_STATE.md commit
+history or the patches/ directory for the exact filename)
+
+Next milestone (not started):
+
+Milestone 2 — reservation creation wiring: create
+lib/actions/create-reservation.ts ("use server") calling
+buildReservationRecord and pushing into `bookings`; update
+booking-flow.tsx's handleConfirm to call it and navigate with only
+?ref=. Awaiting approval.

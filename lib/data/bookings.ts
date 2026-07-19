@@ -11,6 +11,20 @@ export interface OperationsBooking {
   bookedOn: string;
   status: BookingStatus;
   reference: string;
+  /**
+   * Additive fields below — populated for reservations created through
+   * the live booking flow (Phase 2A). Optional so all existing seed
+   * bookings above remain valid without changes. Operations dashboard
+   * components are unaffected since none of these are read there yet.
+   */
+  guests?: string;
+  guestEmail?: string;
+  guestPhone?: string;
+  guestNationality?: string;
+  arrivalTime?: string;
+  specialRequests?: string;
+  selectedExtraIds?: string[];
+  paymentMethod?: string;
 }
 
 /** ISO date string (YYYY-MM-DD) for today + offsetDays. */
