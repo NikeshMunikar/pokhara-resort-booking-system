@@ -3,6 +3,14 @@ import { RoomTypeSummaryTable } from "@/components/operations/room-type-summary-
 import { DailyOverview } from "@/components/operations/daily-overview";
 import { RecentBookingsTable } from "@/components/operations/recent-bookings-table";
 
+/**
+ * Reads the shared in-memory `bookings` array (via lib/operations.ts),
+ * which is mutated by the reservation Server Action. Dynamic rendering
+ * guarantees this dashboard is never statically optimized and always
+ * reflects the current bookings on each request.
+ */
+export const dynamic = "force-dynamic";
+
 export default function OperationsPage() {
   return (
     <main className="mx-auto max-w-7xl px-6 py-section-sm">

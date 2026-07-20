@@ -1149,3 +1149,86 @@ Next milestone (not started):
 Milestone 5 — operations dashboard freshness: add
 `export const dynamic = "force-dynamic"` to app/operations/page.tsx
 only, no logic change. Awaiting approval.
+
+==================================================
+
+# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 5: OPERATIONS DASHBOARD FRESHNESS
+
+Status:
+COMPLETE
+
+Commit:
+(recorded below after commit)
+
+Scope:
+app/operations/page.tsx only — a single additive comment + export
+line. Identical in content and scope to the original Milestone 5 from
+the lost session.
+
+Files modified:
+
+- app/operations/page.tsx
+  Added `export const dynamic = "force-dynamic"` (with a short
+  explanatory comment) directly above `OperationsPage`. Nothing else
+  in the file changed.
+
+Files explicitly NOT touched:
+
+- lib/operations.ts
+- components/operations/overview-cards.tsx
+- components/operations/room-type-summary-table.tsx
+- components/operations/daily-overview.tsx
+- components/operations/recent-bookings-table.tsx
+
+Reason:
+
+Satisfies "operations dashboard reflects new reservations." The only
+gap was the risk of this route being statically optimized and never
+re-reading the shared `bookings` array; this one-line config removes
+that risk without touching dashboard logic.
+
+Verification results:
+
+- `npx tsc --noEmit` → PASS, no errors
+- `npm run lint` → PASS, no errors or warnings
+- `npm run build` → fails, but ONLY on 3 Google Fonts fetches
+  (Inter, Fraunces, IBM Plex Mono) from lib/fonts.ts / app/layout.tsx
+  — confirmed via `curl` that fonts.googleapis.com returns
+  `x-deny-reason: host_not_allowed` from this sandbox's network
+  allow-list. This is a pre-existing sandbox limitation unrelated to
+  any code in this repository (already documented in the original
+  Phase 1 PROJECT_STATE.md and in every subsequent audit) — not a
+  regression introduced by this or any Phase 2A milestone. No other
+  build errors were reported.
+- `git diff app/operations/page.tsx` confirms the change is exactly
+  the 8-line addition (comment + export), zero other lines touched
+
+Dashboard UI/behavior unchanged beyond the dynamic-rendering addition.
+
+This completes Phase 2A (re-implementation): all 5 milestones done,
+matching the original lost implementation's scope and content exactly.
+No database, authentication, API routes, payments, or admin systems
+were introduced.
+
+Backup:
+patches/0005-milestone-5-operations-dynamic.patch
+
+Bundle backup:
+backups/phase-2a.bundle — a portable git bundle containing all Phase
+2A commits (origin/main..HEAD at the time of Milestone 5), created as
+an additional safeguard independent of both GitHub push status and
+this sandbox's survival. See the bundle commit for exact contents.
+
+Outstanding, not part of Phase 2A:
+
+- GitHub push still pending — this entire re-implementation (Milestone
+  0 through 5, plus this bundle) exists only in this sandbox's local
+  clone. Still needs credentials to push. This is now the single most
+  important open item, given the prior data-loss incident.
+- react-day-picker dependency still unused (flagged repeatedly, never
+  in scope for any Phase 2A milestone).
+- Dashboard subtitle copy ("Not connected to a live reservation
+  system") is stale given Milestones 2-5; left untouched per "preserve
+  all existing UI," not fixed.
+
+Awaiting direction on GitHub push and/or Phase 2B.
