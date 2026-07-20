@@ -1,0 +1,210 @@
+From 16c56ec9f832b016778648986759fac20600007c Mon Sep 17 00:00:00 2001
+From: Project Assistant <dev@himalacove.local>
+Date: Mon, 20 Jul 2026 03:31:23 +0000
+Subject: [PATCH] feat(booking): resolve confirmation page via reservation
+ reference lookup
+
+Phase 2A re-implementation, Milestone 3 (confirmation flow only).
+
+- app/booking/confirmation/page.tsx: converted to an async Server
+  Component reading searchParams.ref, calling
+  findReservationByReference (Milestone 1), and passing the resolved
+  reservation to ConfirmationContent as a prop. Added
+  export const dynamic = "force-dynamic". Removed the now-unnecessary
+  Suspense wrapper; existing loading.tsx fallback is unaffected.
+- components/booking/confirmation-content.tsx: removed 'use client'
+  and useSearchParams; now accepts a reservation (OperationsBooking,
+  optional) prop. Fallback UI, calculations, and all JSX unchanged.
+
+This milestone was interrupted partway through by a session boundary
+and resumed from a verified partial state (see PROJECT_STATE.md for
+details) rather than restarted from scratch. Final result matches the
+original Milestone 3 plan exactly.
+
+Verified with npx tsc --noEmit, npm run lint (both clean), and a real
+integration run (via npx tsx): create -> lookup by reference works,
+including the invalid-reference case.
+---
+ PROJECT_STATE.md                            | 75 +++++++++++++++++++++
+ app/booking/confirmation/page.tsx           | 29 +++++---
+ components/booking/confirmation-content.tsx | 38 +++++------
+ 3 files changed, 114 insertions(+), 28 deletions(-)
+
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index ab27621..0117fae 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -993,3 +993,78 @@ app/booking/confirmation/page.tsx a Server Component reading
+ searchParams.ref, call findReservationByReference, pass the result to
+ a modified confirmation-content.tsx (accepts a `reservation` prop
+ instead of reading useSearchParams itself). Awaiting approval.
++
++==================================================
++
++# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 3: CONFIRMATION BY REFERENCE LOOKUP
++
++Status:
++COMPLETE
++
++Commit:
++(recorded below after commit)
++
++Scope:
++Confirmation flow only. No booking creation, availability, search, or
++operations changes. Identical in content and scope to the original
++Milestone 3 from the lost session.
++
++Note on this run: this milestone was interrupted partway through by a
++session boundary (the first edit to confirmation-content.tsx applied
++only the imports and the first 3 of 12 local consts before stopping,
++leaving the file referencing an undefined `searchParams` and not
++compiling). Verified this with a fresh `git status`/`git diff` check
++before resuming, then completed the remaining 9 consts from that exact
++point rather than restarting the file from scratch. Final result is
++identical to a clean single-pass implementation.
++
++Files modified:
++
++- app/booking/confirmation/page.tsx
++  Converted to an async Server Component. Reads `searchParams.ref`
++  (Promise-based), calls `findReservationByReference` (Milestone 1),
++  passes the resolved reservation (or undefined) down as a prop. Added
++  `export const dynamic = "force-dynamic"`. Removed the manual
++  `<Suspense>` wrapper — the existing loading.tsx (untouched) still
++  provides the identical fallback via Next's route-level convention.
++
++- components/booking/confirmation-content.tsx
++  Removed `"use client"` and `useSearchParams`. Added
++  `ConfirmationContentProps` (`reservation?: OperationsBooking`). All
++  12 local consts now read from `reservation` fields instead of
++  `searchParams.get(...)`. Everything from the `!ref || !room` guard
++  onward — fallback UI, calculations, JSX layout — is byte-for-byte
++  unchanged.
++
++Reason:
++
++Satisfies "confirmation uses booking reference lookup," resolving the
++interim gap from Milestone 2.
++
++Verification results:
++
++- `npx tsc --noEmit` → PASS, no errors
++- `npm run lint` → PASS, no errors or warnings
++- `git diff --stat` confirms only the 2 files above modified (39
++  insertions, 28 deletions) — identical scope to the original
++  Milestone 3
++- Confirmed via grep: ConfirmationContent has exactly one caller
++- Real integration check (temporary script, removed after use):
++  built a reservation, pushed it, looked it up by reference — found,
++  matching id and guestName; an invalid reference correctly resolved
++  to undefined
++
++No Phase 1 features changed. Booking creation (Milestone 2),
++availability, search, and operations dashboard are untouched in this
++milestone.
++
++Backup:
++patches/0003-milestone-3-confirmation-lookup.patch (added after
++commit)
++
++Next milestone (not started):
++
++Milestone 4 — real availability: replace the hash-based simulation in
++lib/availability.ts's getAvailabilityStatus with inventory- and
++booking-aware logic (signature unchanged), and move /search results
++computation server-side. Awaiting approval.
+diff --git a/app/booking/confirmation/page.tsx b/app/booking/confirmation/page.tsx
+index 736cb9f..cab775a 100644
+--- a/app/booking/confirmation/page.tsx
++++ b/app/booking/confirmation/page.tsx
+@@ -1,11 +1,22 @@
+-import { Suspense } from "react";
+ import { ConfirmationContent } from "@/components/booking/confirmation-content";
+-import { ConfirmationLoadingSkeleton } from "@/components/booking/confirmation-loading-skeleton";
+-
+-export default function ConfirmationPage() {
+-  return (
+-    <Suspense fallback={<ConfirmationLoadingSkeleton />}>
+-      <ConfirmationContent />
+-    </Suspense>
+-  );
++import { findReservationByReference } from "@/lib/reservations";
++
++/**
++ * Reservations are created in-memory via a Server Action (see
++ * lib/actions/create-reservation.ts). Without this, Next.js could
++ * statically optimize this route and never see newly created
++ * reservations — dynamic rendering guarantees each request re-reads
++ * the current in-memory bookings list.
++ */
++export const dynamic = "force-dynamic";
++
++interface ConfirmationPageProps {
++  searchParams: Promise<{ ref?: string }>;
++}
++
++export default async function ConfirmationPage({ searchParams }: ConfirmationPageProps) {
++  const { ref } = await searchParams;
++  const reservation = ref ? findReservationByReference(ref) : undefined;
++
++  return <ConfirmationContent reservation={reservation} />;
+ }
+diff --git a/components/booking/confirmation-content.tsx b/components/booking/confirmation-content.tsx
+index f520df3..88ee61e 100644
+--- a/components/booking/confirmation-content.tsx
++++ b/components/booking/confirmation-content.tsx
+@@ -1,7 +1,4 @@
+-"use client";
+-
+ import Link from "next/link";
+-import { useSearchParams } from "next/navigation";
+ import { CheckCircle2, Mail, Clock, PhoneCall } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
+@@ -11,24 +8,27 @@ import { extraServices } from "@/lib/data/extra-services";
+ import { paymentMethodLabels } from "@/lib/data/payment-methods";
+ import { arrivalTimeLabels } from "@/lib/data/arrival-times";
+ import { calculateNights, calculateEstimatedTotal } from "@/lib/availability";
++import type { OperationsBooking } from "@/lib/data/bookings";
+ 
+-export function ConfirmationContent() {
+-  const searchParams = useSearchParams();
++interface ConfirmationContentProps {
++  /** Resolved via findReservationByReference in app/booking/confirmation/page.tsx. */
++  reservation?: OperationsBooking;
++}
+ 
+-  const ref = searchParams.get("ref");
+-  const roomId = searchParams.get("room");
+-  const checkIn = searchParams.get("checkIn") ?? "";
+-  const checkOut = searchParams.get("checkOut") ?? "";
+-  const guests = searchParams.get("guests") ?? "";
+-  const fullName = searchParams.get("fullName") ?? "";
+-  const email = searchParams.get("email") ?? "";
+-  const phone = searchParams.get("phone") ?? "";
+-  const nationality = searchParams.get("nationality") ?? "";
+-  const arrivalTime = searchParams.get("arrivalTime") ?? "";
+-  const specialRequests = searchParams.get("specialRequests") ?? "";
+-  const paymentMethod = searchParams.get("paymentMethod") ?? "";
+-  const extrasParam = searchParams.get("extras");
+-  const selectedExtraIds = extrasParam ? extrasParam.split(",") : [];
++export function ConfirmationContent({ reservation }: ConfirmationContentProps) {
++  const ref = reservation?.reference;
++  const roomId = reservation?.roomId;
++  const checkIn = reservation?.checkIn ?? "";
++  const checkOut = reservation?.checkOut ?? "";
++  const guests = reservation?.guests ?? "";
++  const fullName = reservation?.guestName ?? "";
++  const email = reservation?.guestEmail ?? "";
++  const phone = reservation?.guestPhone ?? "";
++  const nationality = reservation?.guestNationality ?? "";
++  const arrivalTime = reservation?.arrivalTime ?? "";
++  const specialRequests = reservation?.specialRequests ?? "";
++  const paymentMethod = reservation?.paymentMethod ?? "";
++  const selectedExtraIds = reservation?.selectedExtraIds ?? [];
+ 
+   const room = rooms.find((r) => r.id === roomId);
+ 
+-- 
+2.43.0
+

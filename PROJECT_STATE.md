@@ -1002,7 +1002,7 @@ Status:
 COMPLETE
 
 Commit:
-(recorded below after commit)
+16c56ec — feat(booking): resolve confirmation page via reservation reference lookup
 
 Scope:
 Confirmation flow only. No booking creation, availability, search, or
@@ -1059,8 +1059,7 @@ availability, search, and operations dashboard are untouched in this
 milestone.
 
 Backup:
-patches/0003-milestone-3-confirmation-lookup.patch (added after
-commit)
+patches/0003-milestone-3-confirmation-lookup.patch
 
 Next milestone (not started):
 
