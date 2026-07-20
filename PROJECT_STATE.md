@@ -1076,7 +1076,7 @@ Status:
 COMPLETE
 
 Commit:
-(recorded below after commit)
+03658bc — feat(availability): replace simulated availability with inventory-based calculation
 
 Scope:
 lib/availability.ts's calculation logic, plus moving /search's results
@@ -1142,7 +1142,7 @@ EmptyState, RoomCard, booking flow, confirmation, and operations
 dashboard are unaffected.
 
 Backup:
-patches/0004-milestone-4-real-availability.patch (added after commit)
+patches/0004-milestone-4-real-availability.patch
 
 Next milestone (not started):
 

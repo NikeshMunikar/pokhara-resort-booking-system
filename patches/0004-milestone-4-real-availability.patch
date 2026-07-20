@@ -1,0 +1,385 @@
+From 03658bc6c38ccfd2dc6a76dba0dfcbfb0790a976 Mon Sep 17 00:00:00 2001
+From: Project Assistant <dev@himalacove.local>
+Date: Mon, 20 Jul 2026 03:36:33 +0000
+Subject: [PATCH] feat(availability): replace simulated availability with
+ inventory-based calculation
+
+Phase 2A re-implementation, Milestone 4.
+
+- lib/availability.ts: getAvailabilityStatus now computes real
+  remaining units (room-inventory.ts unitCount minus overlapping,
+  non-cancelled bookings from bookings.ts) instead of a deterministic
+  hash simulation. Signature unchanged. hashString, calculateNights,
+  calculateEstimatedTotal, validateSearchDates untouched.
+- app/search/page.tsx: converted to an async Server Component that
+  computes hasSearch/validation/nights/results server-side and passes
+  them to SearchResultsContent as props. Added
+  export const dynamic = "force-dynamic".
+- components/search/search-results-content.tsx: now a props-driven
+  Client Component (removed useSearchParams and the client-side
+  useMemo computation). useRouter retained for the re-search bar and
+  clear-filters action. All JSX/styling unchanged.
+
+Necessary because a client bundle only has the bookings array snapshot
+from build/hydration time and would never see reservations created via
+the Milestone 2 Server Action -- moving computation server-side is
+what makes results reflect real, current bookings.
+
+Verified with npx tsc --noEmit, npm run lint (both clean), and a real
+functional check (via npx tsx) against actual seed data: correct unit
+counts, overlapping bookings reduce availability, unknown room ids
+resolve to unavailable, cancelled bookings are excluded, and repeated
+calls are deterministic.
+---
+ PROJECT_STATE.md                             | 82 ++++++++++++++++++++
+ app/search/page.tsx                          | 67 ++++++++++++++--
+ components/search/search-results-content.tsx | 75 ++++++++----------
+ lib/availability.ts                          | 40 ++++++++--
+ 4 files changed, 210 insertions(+), 54 deletions(-)
+
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index c8033dd..59f7336 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -1067,3 +1067,85 @@ Milestone 4 — real availability: replace the hash-based simulation in
+ lib/availability.ts's getAvailabilityStatus with inventory- and
+ booking-aware logic (signature unchanged), and move /search results
+ computation server-side. Awaiting approval.
++
++==================================================
++
++# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 4: REAL AVAILABILITY
++
++Status:
++COMPLETE
++
++Commit:
++(recorded below after commit)
++
++Scope:
++lib/availability.ts's calculation logic, plus moving /search's results
++computation server-side. No booking creation, confirmation, or
++operations changes. Identical in content and scope to the original
++Milestone 4 from the lost session.
++
++Files modified:
++
++- lib/availability.ts
++  Replaced the hash-based `getAvailabilityStatus` simulation with real
++  math: total units from lib/data/room-inventory.ts minus overlapping,
++  non-cancelled bookings from lib/data/bookings.ts (half-open interval
++  overlap check). Thresholds: 0 remaining -> unavailable, 1 -> limited,
++  2+ -> available. Public API unchanged: `getAvailabilityStatus(roomId,
++  checkIn, checkOut): AvailabilityStatus` signature identical.
++  `hashString`, `calculateNights`, `calculateEstimatedTotal`,
++  `validateSearchDates` untouched.
++
++- app/search/page.tsx
++  Converted to an async Server Component. Reads `searchParams` (Promise
++  -based), computes hasSearch/validation/nights/results server-side,
++  passes it all down as props. Added
++  `export const dynamic = "force-dynamic"`. Removed the manual
++  `<Suspense>` wrapper — app/search/loading.tsx (untouched) still
++  provides the identical fallback.
++
++- components/search/search-results-content.tsx
++  Removed `useSearchParams` and the `useMemo` results computation; now
++  accepts `checkIn`, `checkOut`, `guests`, `roomType`, `hasSearch`,
++  `validationError`, `nights`, and `results` as props. Still a Client
++  Component — `useRouter` retained for the re-search bar and clear-
++  filters action. Remount key now derives from props instead of
++  `searchParams.toString()`. All JSX, conditional branches, and styling
++  unchanged.
++
++Reason:
++
++Satisfies "availability uses inventory and reservations instead of
++simulation." Moving computation server-side is necessary, not
++optional: a client bundle only has the `bookings` array snapshot from
++build/hydration time and would never see reservations created via the
++Milestone 2 Server Action.
++
++Verification results:
++
++- `npx tsc --noEmit` → PASS, no errors
++- `npm run lint` → PASS, no errors or warnings
++- `git diff --stat` confirms only the 3 files above modified (128
++  insertions, 54 deletions) — identical scope to the original
++  Milestone 4
++- Confirmed via grep: getAvailabilityStatus has exactly one call site;
++  SearchResultsContent has exactly one caller
++- Real functional check (temporary script, removed after use), same
++  checks as the original Milestone 4 run, against actual seed data:
++  correct unit counts, overlapping active bookings reduce
++  availability, unknown roomId resolves to unavailable, repeated calls
++  deterministic, Cancelled bookings excluded — all results identical
++  to the original run
++
++No Phase 1 features changed: SearchResultsBar, SearchFormFields,
++EmptyState, RoomCard, booking flow, confirmation, and operations
++dashboard are unaffected.
++
++Backup:
++patches/0004-milestone-4-real-availability.patch (added after commit)
++
++Next milestone (not started):
++
++Milestone 5 — operations dashboard freshness: add
++`export const dynamic = "force-dynamic"` to app/operations/page.tsx
++only, no logic change. Awaiting approval.
+diff --git a/app/search/page.tsx b/app/search/page.tsx
+index 81f19fc..7b60261 100644
+--- a/app/search/page.tsx
++++ b/app/search/page.tsx
+@@ -1,11 +1,66 @@
+-import { Suspense } from "react";
+ import { SearchResultsContent } from "@/components/search/search-results-content";
+-import { SearchLoadingSkeleton } from "@/components/search/search-loading-skeleton";
++import { rooms } from "@/lib/data/rooms";
++import {
++  getAvailabilityStatus,
++  calculateNights,
++  calculateEstimatedTotal,
++  validateSearchDates,
++} from "@/lib/availability";
++
++/**
++ * Results depend on the current in-memory `bookings` array (mutated by
++ * the reservation Server Action) via getAvailabilityStatus, so this
++ * route must never be statically optimized.
++ */
++export const dynamic = "force-dynamic";
++
++interface SearchPageProps {
++  searchParams: Promise<{
++    checkIn?: string;
++    checkOut?: string;
++    guests?: string;
++    roomType?: string;
++  }>;
++}
++
++export default async function SearchPage({ searchParams }: SearchPageProps) {
++  const params = await searchParams;
++  const checkIn = params.checkIn ?? "";
++  const checkOut = params.checkOut ?? "";
++  const guests = params.guests ?? "2";
++  const roomType = params.roomType ?? "any";
++
++  const hasSearch = Boolean(checkIn && checkOut);
++  const validation = hasSearch ? validateSearchDates(checkIn, checkOut) : null;
++  const nights = hasSearch && validation?.valid ? calculateNights(checkIn, checkOut) : 0;
++  const validationError = hasSearch && validation && !validation.valid ? validation.error : undefined;
++
++  const results =
++    hasSearch && validation?.valid
++      ? rooms
++          .filter((room) => {
++            if (roomType !== "any" && room.id !== roomType) return false;
++            const minGuests = Number(guests);
++            if (!Number.isNaN(minGuests) && room.maxGuests < minGuests) return false;
++            return true;
++          })
++          .map((room) => ({
++            room,
++            status: getAvailabilityStatus(room.id, checkIn, checkOut),
++            total: calculateEstimatedTotal(room.pricePerNight, nights),
++          }))
++      : [];
+ 
+-export default function SearchPage() {
+   return (
+-    <Suspense fallback={<SearchLoadingSkeleton />}>
+-      <SearchResultsContent />
+-    </Suspense>
++    <SearchResultsContent
++      checkIn={checkIn}
++      checkOut={checkOut}
++      guests={guests}
++      roomType={roomType}
++      hasSearch={hasSearch}
++      validationError={validationError}
++      nights={nights}
++      results={results}
++    />
+   );
+ }
+diff --git a/components/search/search-results-content.tsx b/components/search/search-results-content.tsx
+index bdc9f94..71989ba 100644
+--- a/components/search/search-results-content.tsx
++++ b/components/search/search-results-content.tsx
+@@ -1,48 +1,41 @@
+ "use client";
+ 
+-import { useMemo } from "react";
+-import { useRouter, useSearchParams } from "next/navigation";
++import { useRouter } from "next/navigation";
+ import { SectionHeading } from "@/components/home/section-heading";
+ import { RoomCard } from "@/components/home/room-card";
+ import { EmptyState } from "@/components/rooms/empty-state";
+ import { SearchResultsBar, type SearchCriteria } from "@/components/search/search-results-bar";
+-import { rooms } from "@/lib/data/rooms";
+-import {
+-  getAvailabilityStatus,
+-  calculateNights,
+-  calculateEstimatedTotal,
+-  validateSearchDates,
+-} from "@/lib/availability";
++import type { Room } from "@/lib/types/room";
++import type { AvailabilityStatus } from "@/lib/availability";
+ 
+-export function SearchResultsContent() {
+-  const router = useRouter();
+-  const searchParams = useSearchParams();
+-
+-  const checkIn = searchParams.get("checkIn") ?? "";
+-  const checkOut = searchParams.get("checkOut") ?? "";
+-  const guests = searchParams.get("guests") ?? "2";
+-  const roomType = searchParams.get("roomType") ?? "any";
+-
+-  const hasSearch = Boolean(checkIn && checkOut);
+-  const validation = hasSearch ? validateSearchDates(checkIn, checkOut) : null;
+-  const nights = hasSearch && validation?.valid ? calculateNights(checkIn, checkOut) : 0;
+-
+-  const results = useMemo(() => {
+-    if (!hasSearch || !validation?.valid) return [];
++interface SearchResult {
++  room: Room;
++  status: AvailabilityStatus;
++  total: number;
++}
+ 
+-    const matching = rooms.filter((room) => {
+-      if (roomType !== "any" && room.id !== roomType) return false;
+-      const minGuests = Number(guests);
+-      if (!Number.isNaN(minGuests) && room.maxGuests < minGuests) return false;
+-      return true;
+-    });
++interface SearchResultsContentProps {
++  checkIn: string;
++  checkOut: string;
++  guests: string;
++  roomType: string;
++  hasSearch: boolean;
++  validationError?: string;
++  nights: number;
++  results: SearchResult[];
++}
+ 
+-    return matching.map((room) => ({
+-      room,
+-      status: getAvailabilityStatus(room.id, checkIn, checkOut),
+-      total: calculateEstimatedTotal(room.pricePerNight, nights),
+-    }));
+-  }, [hasSearch, validation?.valid, roomType, guests, checkIn, checkOut, nights]);
++export function SearchResultsContent({
++  checkIn,
++  checkOut,
++  guests,
++  roomType,
++  hasSearch,
++  validationError,
++  nights,
++  results,
++}: SearchResultsContentProps) {
++  const router = useRouter();
+ 
+   function handleSearch(criteria: SearchCriteria) {
+     const query = new URLSearchParams({
+@@ -55,7 +48,7 @@ export function SearchResultsContent() {
+   }
+ 
+   const formattedRange =
+-    hasSearch && validation?.valid
++    hasSearch && !validationError
+       ? `${new Date(checkIn).toLocaleDateString("en-US", {
+           month: "short",
+           day: "numeric",
+@@ -71,7 +64,7 @@ export function SearchResultsContent() {
+ 
+       <div className="mt-6">
+         <SearchResultsBar
+-          key={searchParams.toString()}
++          key={`${checkIn}-${checkOut}-${guests}-${roomType}`}
+           initialCheckIn={checkIn}
+           initialCheckOut={checkOut}
+           initialGuests={guests}
+@@ -87,11 +80,11 @@ export function SearchResultsContent() {
+           </p>
+         )}
+ 
+-        {hasSearch && validation && !validation.valid && (
+-          <p className="text-sm text-danger">{validation.error}</p>
++        {hasSearch && validationError && (
++          <p className="text-sm text-danger">{validationError}</p>
+         )}
+ 
+-        {hasSearch && validation?.valid && (
++        {hasSearch && !validationError && (
+           <>
+             <p className="text-sm text-stone">
+               <span className="font-data text-dusk">{results.length}</span>{" "}
+diff --git a/lib/availability.ts b/lib/availability.ts
+index 0428807..1a7c1c9 100644
+--- a/lib/availability.ts
++++ b/lib/availability.ts
+@@ -1,3 +1,6 @@
++import { roomInventory } from "@/lib/data/room-inventory";
++import { bookings } from "@/lib/data/bookings";
++
+ export type AvailabilityStatus = "available" | "limited" | "unavailable";
+ 
+ /**
+@@ -15,19 +18,42 @@ export function hashString(input: string): number {
+ }
+ 
+ /**
+- * Simulated availability for a room on a given date range.
+- * Weighting: ~70% available, ~20% limited (1 room left), ~10% unavailable.
+- * Deterministic — refreshing or revisiting the same search never flickers.
++ * Returns true if two date ranges [aStart, aEnd) and [bStart, bEnd)
++ * overlap on at least one night. Uses half-open intervals (checkout
++ * day itself doesn't count as occupied), matching the convention
++ * already used by operations.ts's isBookingActiveToday.
++ */
++function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
++  return aStart < bEnd && bStart < aEnd;
++}
++
++/**
++ * Real availability for a room on a given date range, based on
++ * physical unit count (lib/data/room-inventory.ts) minus overlapping,
++ * non-cancelled bookings (lib/data/bookings.ts) for that room.
++ * Thresholds: 0 units remaining -> unavailable, 1 remaining -> limited,
++ * 2+ remaining -> available.
+  */
+ export function getAvailabilityStatus(
+   roomId: string,
+   checkIn: string,
+   checkOut: string
+ ): AvailabilityStatus {
+-  const bucket = hashString(`${roomId}-${checkIn}-${checkOut}`) % 10;
+-  if (bucket < 7) return "available";
+-  if (bucket < 9) return "limited";
+-  return "unavailable";
++  const inventory = roomInventory.find((inv) => inv.roomId === roomId);
++  const totalUnits = inventory?.unitCount ?? 0;
++
++  const overlappingBookings = bookings.filter(
++    (booking) =>
++      booking.roomId === roomId &&
++      booking.status !== "Cancelled" &&
++      rangesOverlap(checkIn, checkOut, booking.checkIn, booking.checkOut)
++  ).length;
++
++  const remainingUnits = totalUnits - overlappingBookings;
++
++  if (remainingUnits <= 0) return "unavailable";
++  if (remainingUnits === 1) return "limited";
++  return "available";
+ }
+ 
+ /**
+-- 
+2.43.0
+
