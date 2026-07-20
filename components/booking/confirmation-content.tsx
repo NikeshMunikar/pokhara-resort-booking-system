@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Mail, Clock, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,24 +8,27 @@ import { extraServices } from "@/lib/data/extra-services";
 import { paymentMethodLabels } from "@/lib/data/payment-methods";
 import { arrivalTimeLabels } from "@/lib/data/arrival-times";
 import { calculateNights, calculateEstimatedTotal } from "@/lib/availability";
+import type { OperationsBooking } from "@/lib/data/bookings";
 
-export function ConfirmationContent() {
-  const searchParams = useSearchParams();
+interface ConfirmationContentProps {
+  /** Resolved via findReservationByReference in app/booking/confirmation/page.tsx. */
+  reservation?: OperationsBooking;
+}
 
-  const ref = searchParams.get("ref");
-  const roomId = searchParams.get("room");
-  const checkIn = searchParams.get("checkIn") ?? "";
-  const checkOut = searchParams.get("checkOut") ?? "";
-  const guests = searchParams.get("guests") ?? "";
-  const fullName = searchParams.get("fullName") ?? "";
-  const email = searchParams.get("email") ?? "";
-  const phone = searchParams.get("phone") ?? "";
-  const nationality = searchParams.get("nationality") ?? "";
-  const arrivalTime = searchParams.get("arrivalTime") ?? "";
-  const specialRequests = searchParams.get("specialRequests") ?? "";
-  const paymentMethod = searchParams.get("paymentMethod") ?? "";
-  const extrasParam = searchParams.get("extras");
-  const selectedExtraIds = extrasParam ? extrasParam.split(",") : [];
+export function ConfirmationContent({ reservation }: ConfirmationContentProps) {
+  const ref = reservation?.reference;
+  const roomId = reservation?.roomId;
+  const checkIn = reservation?.checkIn ?? "";
+  const checkOut = reservation?.checkOut ?? "";
+  const guests = reservation?.guests ?? "";
+  const fullName = reservation?.guestName ?? "";
+  const email = reservation?.guestEmail ?? "";
+  const phone = reservation?.guestPhone ?? "";
+  const nationality = reservation?.guestNationality ?? "";
+  const arrivalTime = reservation?.arrivalTime ?? "";
+  const specialRequests = reservation?.specialRequests ?? "";
+  const paymentMethod = reservation?.paymentMethod ?? "";
+  const selectedExtraIds = reservation?.selectedExtraIds ?? [];
 
   const room = rooms.find((r) => r.id === roomId);
 

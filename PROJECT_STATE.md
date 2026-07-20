@@ -993,3 +993,78 @@ app/booking/confirmation/page.tsx a Server Component reading
 searchParams.ref, call findReservationByReference, pass the result to
 a modified confirmation-content.tsx (accepts a `reservation` prop
 instead of reading useSearchParams itself). Awaiting approval.
+
+==================================================
+
+# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 3: CONFIRMATION BY REFERENCE LOOKUP
+
+Status:
+COMPLETE
+
+Commit:
+(recorded below after commit)
+
+Scope:
+Confirmation flow only. No booking creation, availability, search, or
+operations changes. Identical in content and scope to the original
+Milestone 3 from the lost session.
+
+Note on this run: this milestone was interrupted partway through by a
+session boundary (the first edit to confirmation-content.tsx applied
+only the imports and the first 3 of 12 local consts before stopping,
+leaving the file referencing an undefined `searchParams` and not
+compiling). Verified this with a fresh `git status`/`git diff` check
+before resuming, then completed the remaining 9 consts from that exact
+point rather than restarting the file from scratch. Final result is
+identical to a clean single-pass implementation.
+
+Files modified:
+
+- app/booking/confirmation/page.tsx
+  Converted to an async Server Component. Reads `searchParams.ref`
+  (Promise-based), calls `findReservationByReference` (Milestone 1),
+  passes the resolved reservation (or undefined) down as a prop. Added
+  `export const dynamic = "force-dynamic"`. Removed the manual
+  `<Suspense>` wrapper — the existing loading.tsx (untouched) still
+  provides the identical fallback via Next's route-level convention.
+
+- components/booking/confirmation-content.tsx
+  Removed `"use client"` and `useSearchParams`. Added
+  `ConfirmationContentProps` (`reservation?: OperationsBooking`). All
+  12 local consts now read from `reservation` fields instead of
+  `searchParams.get(...)`. Everything from the `!ref || !room` guard
+  onward — fallback UI, calculations, JSX layout — is byte-for-byte
+  unchanged.
+
+Reason:
+
+Satisfies "confirmation uses booking reference lookup," resolving the
+interim gap from Milestone 2.
+
+Verification results:
+
+- `npx tsc --noEmit` → PASS, no errors
+- `npm run lint` → PASS, no errors or warnings
+- `git diff --stat` confirms only the 2 files above modified (39
+  insertions, 28 deletions) — identical scope to the original
+  Milestone 3
+- Confirmed via grep: ConfirmationContent has exactly one caller
+- Real integration check (temporary script, removed after use):
+  built a reservation, pushed it, looked it up by reference — found,
+  matching id and guestName; an invalid reference correctly resolved
+  to undefined
+
+No Phase 1 features changed. Booking creation (Milestone 2),
+availability, search, and operations dashboard are untouched in this
+milestone.
+
+Backup:
+patches/0003-milestone-3-confirmation-lookup.patch (added after
+commit)
+
+Next milestone (not started):
+
+Milestone 4 — real availability: replace the hash-based simulation in
+lib/availability.ts's getAvailabilityStatus with inventory- and
+booking-aware logic (signature unchanged), and move /search results
+computation server-side. Awaiting approval.
