@@ -1,0 +1,147 @@
+From 6eee0aca72f370f8d9e134c7d4e61c00481301ba Mon Sep 17 00:00:00 2001
+From: Project Assistant <dev@himalacove.local>
+Date: Mon, 20 Jul 2026 03:48:55 +0000
+Subject: [PATCH] feat(operations): ensure dashboard reflects live reservation
+ data
+
+Phase 2A re-implementation, Milestone 5 - final milestone.
+
+- app/operations/page.tsx: added export const dynamic = "force-dynamic"
+  (plus a short explanatory comment) directly above OperationsPage.
+  No other change to this file, and no change to lib/operations.ts or
+  any of the 4 operations components.
+
+Necessary because lib/operations.ts already reads the shared bookings
+array correctly -- the only gap was the risk of Next.js statically
+optimizing this route and never re-reading it.
+
+Verified with npx tsc --noEmit and npm run lint (both clean).
+npm run build fails only on 3 Google Fonts fetches (Inter, Fraunces,
+IBM Plex Mono), confirmed via curl to be a pre-existing sandbox
+network restriction (fonts.googleapis.com returns
+x-deny-reason: host_not_allowed), unrelated to this or any prior
+Phase 2A change.
+
+This completes Phase 2A (re-implementation): customer booking creates
+a reservation record, availability uses inventory + reservations,
+confirmation uses reference lookup, and the operations dashboard
+reflects new reservations -- with no database, authentication, API
+routes, payments, or admin systems introduced.
+---
+ PROJECT_STATE.md        | 83 +++++++++++++++++++++++++++++++++++++++++
+ app/operations/page.tsx |  8 ++++
+ 2 files changed, 91 insertions(+)
+
+diff --git a/PROJECT_STATE.md b/PROJECT_STATE.md
+index 78bac4e..b3f7c1c 100644
+--- a/PROJECT_STATE.md
++++ b/PROJECT_STATE.md
+@@ -1149,3 +1149,86 @@ Next milestone (not started):
+ Milestone 5 — operations dashboard freshness: add
+ `export const dynamic = "force-dynamic"` to app/operations/page.tsx
+ only, no logic change. Awaiting approval.
++
++==================================================
++
++# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 5: OPERATIONS DASHBOARD FRESHNESS
++
++Status:
++COMPLETE
++
++Commit:
++(recorded below after commit)
++
++Scope:
++app/operations/page.tsx only — a single additive comment + export
++line. Identical in content and scope to the original Milestone 5 from
++the lost session.
++
++Files modified:
++
++- app/operations/page.tsx
++  Added `export const dynamic = "force-dynamic"` (with a short
++  explanatory comment) directly above `OperationsPage`. Nothing else
++  in the file changed.
++
++Files explicitly NOT touched:
++
++- lib/operations.ts
++- components/operations/overview-cards.tsx
++- components/operations/room-type-summary-table.tsx
++- components/operations/daily-overview.tsx
++- components/operations/recent-bookings-table.tsx
++
++Reason:
++
++Satisfies "operations dashboard reflects new reservations." The only
++gap was the risk of this route being statically optimized and never
++re-reading the shared `bookings` array; this one-line config removes
++that risk without touching dashboard logic.
++
++Verification results:
++
++- `npx tsc --noEmit` → PASS, no errors
++- `npm run lint` → PASS, no errors or warnings
++- `npm run build` → fails, but ONLY on 3 Google Fonts fetches
++  (Inter, Fraunces, IBM Plex Mono) from lib/fonts.ts / app/layout.tsx
++  — confirmed via `curl` that fonts.googleapis.com returns
++  `x-deny-reason: host_not_allowed` from this sandbox's network
++  allow-list. This is a pre-existing sandbox limitation unrelated to
++  any code in this repository (already documented in the original
++  Phase 1 PROJECT_STATE.md and in every subsequent audit) — not a
++  regression introduced by this or any Phase 2A milestone. No other
++  build errors were reported.
++- `git diff app/operations/page.tsx` confirms the change is exactly
++  the 8-line addition (comment + export), zero other lines touched
++
++Dashboard UI/behavior unchanged beyond the dynamic-rendering addition.
++
++This completes Phase 2A (re-implementation): all 5 milestones done,
++matching the original lost implementation's scope and content exactly.
++No database, authentication, API routes, payments, or admin systems
++were introduced.
++
++Backup:
++patches/0005-milestone-5-operations-dynamic.patch
++
++Bundle backup:
++backups/phase-2a.bundle — a portable git bundle containing all Phase
++2A commits (origin/main..HEAD at the time of Milestone 5), created as
++an additional safeguard independent of both GitHub push status and
++this sandbox's survival. See the bundle commit for exact contents.
++
++Outstanding, not part of Phase 2A:
++
++- GitHub push still pending — this entire re-implementation (Milestone
++  0 through 5, plus this bundle) exists only in this sandbox's local
++  clone. Still needs credentials to push. This is now the single most
++  important open item, given the prior data-loss incident.
++- react-day-picker dependency still unused (flagged repeatedly, never
++  in scope for any Phase 2A milestone).
++- Dashboard subtitle copy ("Not connected to a live reservation
++  system") is stale given Milestones 2-5; left untouched per "preserve
++  all existing UI," not fixed.
++
++Awaiting direction on GitHub push and/or Phase 2B.
+diff --git a/app/operations/page.tsx b/app/operations/page.tsx
+index 1b205bb..25e88f5 100644
+--- a/app/operations/page.tsx
++++ b/app/operations/page.tsx
+@@ -3,6 +3,14 @@ import { RoomTypeSummaryTable } from "@/components/operations/room-type-summary-
+ import { DailyOverview } from "@/components/operations/daily-overview";
+ import { RecentBookingsTable } from "@/components/operations/recent-bookings-table";
+ 
++/**
++ * Reads the shared in-memory `bookings` array (via lib/operations.ts),
++ * which is mutated by the reservation Server Action. Dynamic rendering
++ * guarantees this dashboard is never statically optimized and always
++ * reflects the current bookings on each request.
++ */
++export const dynamic = "force-dynamic";
++
+ export default function OperationsPage() {
+   return (
+     <main className="mx-auto max-w-7xl px-6 py-section-sm">
+-- 
+2.43.0
+

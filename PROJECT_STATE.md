@@ -1158,7 +1158,7 @@ Status:
 COMPLETE
 
 Commit:
-(recorded below after commit)
+6eee0ac — feat(operations): ensure dashboard reflects live reservation data
 
 Scope:
 app/operations/page.tsx only — a single additive comment + export
