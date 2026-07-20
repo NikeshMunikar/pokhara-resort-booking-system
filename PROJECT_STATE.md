@@ -1067,3 +1067,85 @@ Milestone 4 — real availability: replace the hash-based simulation in
 lib/availability.ts's getAvailabilityStatus with inventory- and
 booking-aware logic (signature unchanged), and move /search results
 computation server-side. Awaiting approval.
+
+==================================================
+
+# PHASE 2A (RE-IMPLEMENTATION) — MILESTONE 4: REAL AVAILABILITY
+
+Status:
+COMPLETE
+
+Commit:
+(recorded below after commit)
+
+Scope:
+lib/availability.ts's calculation logic, plus moving /search's results
+computation server-side. No booking creation, confirmation, or
+operations changes. Identical in content and scope to the original
+Milestone 4 from the lost session.
+
+Files modified:
+
+- lib/availability.ts
+  Replaced the hash-based `getAvailabilityStatus` simulation with real
+  math: total units from lib/data/room-inventory.ts minus overlapping,
+  non-cancelled bookings from lib/data/bookings.ts (half-open interval
+  overlap check). Thresholds: 0 remaining -> unavailable, 1 -> limited,
+  2+ -> available. Public API unchanged: `getAvailabilityStatus(roomId,
+  checkIn, checkOut): AvailabilityStatus` signature identical.
+  `hashString`, `calculateNights`, `calculateEstimatedTotal`,
+  `validateSearchDates` untouched.
+
+- app/search/page.tsx
+  Converted to an async Server Component. Reads `searchParams` (Promise
+  -based), computes hasSearch/validation/nights/results server-side,
+  passes it all down as props. Added
+  `export const dynamic = "force-dynamic"`. Removed the manual
+  `<Suspense>` wrapper — app/search/loading.tsx (untouched) still
+  provides the identical fallback.
+
+- components/search/search-results-content.tsx
+  Removed `useSearchParams` and the `useMemo` results computation; now
+  accepts `checkIn`, `checkOut`, `guests`, `roomType`, `hasSearch`,
+  `validationError`, `nights`, and `results` as props. Still a Client
+  Component — `useRouter` retained for the re-search bar and clear-
+  filters action. Remount key now derives from props instead of
+  `searchParams.toString()`. All JSX, conditional branches, and styling
+  unchanged.
+
+Reason:
+
+Satisfies "availability uses inventory and reservations instead of
+simulation." Moving computation server-side is necessary, not
+optional: a client bundle only has the `bookings` array snapshot from
+build/hydration time and would never see reservations created via the
+Milestone 2 Server Action.
+
+Verification results:
+
+- `npx tsc --noEmit` → PASS, no errors
+- `npm run lint` → PASS, no errors or warnings
+- `git diff --stat` confirms only the 3 files above modified (128
+  insertions, 54 deletions) — identical scope to the original
+  Milestone 4
+- Confirmed via grep: getAvailabilityStatus has exactly one call site;
+  SearchResultsContent has exactly one caller
+- Real functional check (temporary script, removed after use), same
+  checks as the original Milestone 4 run, against actual seed data:
+  correct unit counts, overlapping active bookings reduce
+  availability, unknown roomId resolves to unavailable, repeated calls
+  deterministic, Cancelled bookings excluded — all results identical
+  to the original run
+
+No Phase 1 features changed: SearchResultsBar, SearchFormFields,
+EmptyState, RoomCard, booking flow, confirmation, and operations
+dashboard are unaffected.
+
+Backup:
+patches/0004-milestone-4-real-availability.patch (added after commit)
+
+Next milestone (not started):
+
+Milestone 5 — operations dashboard freshness: add
+`export const dynamic = "force-dynamic"` to app/operations/page.tsx
+only, no logic change. Awaiting approval.

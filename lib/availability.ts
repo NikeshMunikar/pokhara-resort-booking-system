@@ -1,3 +1,6 @@
+import { roomInventory } from "@/lib/data/room-inventory";
+import { bookings } from "@/lib/data/bookings";
+
 export type AvailabilityStatus = "available" | "limited" | "unavailable";
 
 /**
@@ -15,19 +18,42 @@ export function hashString(input: string): number {
 }
 
 /**
- * Simulated availability for a room on a given date range.
- * Weighting: ~70% available, ~20% limited (1 room left), ~10% unavailable.
- * Deterministic — refreshing or revisiting the same search never flickers.
+ * Returns true if two date ranges [aStart, aEnd) and [bStart, bEnd)
+ * overlap on at least one night. Uses half-open intervals (checkout
+ * day itself doesn't count as occupied), matching the convention
+ * already used by operations.ts's isBookingActiveToday.
+ */
+function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/**
+ * Real availability for a room on a given date range, based on
+ * physical unit count (lib/data/room-inventory.ts) minus overlapping,
+ * non-cancelled bookings (lib/data/bookings.ts) for that room.
+ * Thresholds: 0 units remaining -> unavailable, 1 remaining -> limited,
+ * 2+ remaining -> available.
  */
 export function getAvailabilityStatus(
   roomId: string,
   checkIn: string,
   checkOut: string
 ): AvailabilityStatus {
-  const bucket = hashString(`${roomId}-${checkIn}-${checkOut}`) % 10;
-  if (bucket < 7) return "available";
-  if (bucket < 9) return "limited";
-  return "unavailable";
+  const inventory = roomInventory.find((inv) => inv.roomId === roomId);
+  const totalUnits = inventory?.unitCount ?? 0;
+
+  const overlappingBookings = bookings.filter(
+    (booking) =>
+      booking.roomId === roomId &&
+      booking.status !== "Cancelled" &&
+      rangesOverlap(checkIn, checkOut, booking.checkIn, booking.checkOut)
+  ).length;
+
+  const remainingUnits = totalUnits - overlappingBookings;
+
+  if (remainingUnits <= 0) return "unavailable";
+  if (remainingUnits === 1) return "limited";
+  return "available";
 }
 
 /**

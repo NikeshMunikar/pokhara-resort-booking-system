@@ -1,48 +1,41 @@
 "use client";
 
-import { useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { SectionHeading } from "@/components/home/section-heading";
 import { RoomCard } from "@/components/home/room-card";
 import { EmptyState } from "@/components/rooms/empty-state";
 import { SearchResultsBar, type SearchCriteria } from "@/components/search/search-results-bar";
-import { rooms } from "@/lib/data/rooms";
-import {
-  getAvailabilityStatus,
-  calculateNights,
-  calculateEstimatedTotal,
-  validateSearchDates,
-} from "@/lib/availability";
+import type { Room } from "@/lib/types/room";
+import type { AvailabilityStatus } from "@/lib/availability";
 
-export function SearchResultsContent() {
+interface SearchResult {
+  room: Room;
+  status: AvailabilityStatus;
+  total: number;
+}
+
+interface SearchResultsContentProps {
+  checkIn: string;
+  checkOut: string;
+  guests: string;
+  roomType: string;
+  hasSearch: boolean;
+  validationError?: string;
+  nights: number;
+  results: SearchResult[];
+}
+
+export function SearchResultsContent({
+  checkIn,
+  checkOut,
+  guests,
+  roomType,
+  hasSearch,
+  validationError,
+  nights,
+  results,
+}: SearchResultsContentProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const checkIn = searchParams.get("checkIn") ?? "";
-  const checkOut = searchParams.get("checkOut") ?? "";
-  const guests = searchParams.get("guests") ?? "2";
-  const roomType = searchParams.get("roomType") ?? "any";
-
-  const hasSearch = Boolean(checkIn && checkOut);
-  const validation = hasSearch ? validateSearchDates(checkIn, checkOut) : null;
-  const nights = hasSearch && validation?.valid ? calculateNights(checkIn, checkOut) : 0;
-
-  const results = useMemo(() => {
-    if (!hasSearch || !validation?.valid) return [];
-
-    const matching = rooms.filter((room) => {
-      if (roomType !== "any" && room.id !== roomType) return false;
-      const minGuests = Number(guests);
-      if (!Number.isNaN(minGuests) && room.maxGuests < minGuests) return false;
-      return true;
-    });
-
-    return matching.map((room) => ({
-      room,
-      status: getAvailabilityStatus(room.id, checkIn, checkOut),
-      total: calculateEstimatedTotal(room.pricePerNight, nights),
-    }));
-  }, [hasSearch, validation?.valid, roomType, guests, checkIn, checkOut, nights]);
 
   function handleSearch(criteria: SearchCriteria) {
     const query = new URLSearchParams({
@@ -55,7 +48,7 @@ export function SearchResultsContent() {
   }
 
   const formattedRange =
-    hasSearch && validation?.valid
+    hasSearch && !validationError
       ? `${new Date(checkIn).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
@@ -71,7 +64,7 @@ export function SearchResultsContent() {
 
       <div className="mt-6">
         <SearchResultsBar
-          key={searchParams.toString()}
+          key={`${checkIn}-${checkOut}-${guests}-${roomType}`}
           initialCheckIn={checkIn}
           initialCheckOut={checkOut}
           initialGuests={guests}
@@ -87,11 +80,11 @@ export function SearchResultsContent() {
           </p>
         )}
 
-        {hasSearch && validation && !validation.valid && (
-          <p className="text-sm text-danger">{validation.error}</p>
+        {hasSearch && validationError && (
+          <p className="text-sm text-danger">{validationError}</p>
         )}
 
-        {hasSearch && validation?.valid && (
+        {hasSearch && !validationError && (
           <>
             <p className="text-sm text-stone">
               <span className="font-data text-dusk">{results.length}</span>{" "}
